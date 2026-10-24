@@ -1,15 +1,18 @@
 # Subtitle Studio
 
-A Persian RTL web application for downloading publicly available subtitles from YouTube and Vimeo. Built with FastAPI and yt-dlp.
+A Persian right-to-left subtitle tool. Paste a public YouTube video link, choose an available caption track, and download it as TXT, SRT, or VTT. You can also convert an existing SRT/VTT file locally in your browser.
 
-## Features
+## Cloudflare Workers
 
-- Inspect manually provided and auto-generated caption tracks.
-- Download as TXT, SRT, or VTT.
-- Responsive RTL interface.
-- No DRM bypass, login bypass, or speech-to-text in the MVP.
+The public Worker serves the interface and reads YouTube's publicly available caption tracks. It does not download video files. Private, age-restricted, blocked, or captionless videos may not work; YouTube may also rate-limit automated requests.
 
-## Run locally
+Deploy the Worker from this repository with the Cloudflare Workers build settings:
+
+- Deploy command: `npx wrangler deploy`
+- Main entry: `worker.js`
+- Free Workers plan
+
+## Run the Python version locally or on a Python host
 
 Requires Python 3.12+.
 
@@ -20,7 +23,7 @@ pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
-Open http://localhost:8000.
+Open http://localhost:8000. The Python version uses FastAPI and yt-dlp to inspect caption tracks and retrieve captions without downloading the video.
 
 ## Docker
 
@@ -29,24 +32,6 @@ docker build -t subtitle-studio .
 docker run --rm -p 8000:8000 subtitle-studio
 ```
 
-Open http://localhost:8000.
+## Limitations
 
-## Deployment
-
-This application requires a Python-capable host (for example, Render, Railway, or a VPS). **GitHub Pages alone cannot execute FastAPI**. Set the start command to:
-
-```bash
-uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}
-```
-
-The root route provides the web interface; `/api/health` is a health-check endpoint.
-
-## Limitations and safety
-
-Video platforms can block or rate-limit subtitle retrieval. Only publicly available caption tracks are supported. YouTube/Vimeo caption URLs are restricted to approved hosts, but production deployment additionally needs DNS/IP-level egress protection, per-IP request limits, concurrency limits, observability, caching, and testing with real videos.
-
-REA (morluto/rea) is a separate reverse-engineering analysis tool, not an extraction dependency. Use it only where useful for examining observable web behavior.
-
-## Project status
-
-MVP source code committed to the `main` branch. Live functional tests and public deployment are pending.
+Only public caption tracks are supported. No DRM bypass, login bypass, video download, or speech-to-text is provided. The Worker fetches YouTube pages and caption data, so platform rate limits or changes to YouTube's page format can temporarily prevent extraction.
