@@ -73,12 +73,56 @@ function captionTracks(data) {
   })).filter(track => track.language && track.baseUrl);
 }
 
+async function legacyCaptionTracks(id) {
+  for (const endpoint of ["https://www.youtube.com/api/timedtext", "https://video.google.com/timedtext"]) {
+    const listUrl = new URL(endpoint);
+    listUrl.searchParams.set("type", "list");
+    listUrl.searchParams.set("v", id);
+    try {
+      const response = await fetch(listUrl, { headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+        "referer": "https://www.youtube.com/"
+      }});
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const tracks = [];
+      for (const match of xml.matchAll(/<track\\b([^>]*)\\/?\\s*>/gi)) {
+        const attrs = {};
+        for (const item of match[1].matchAll(/([\\w-]+)\\s*=\\s*"([^"]*)"/g)) attrs[item[1]] = item[2];
+        const language = attrs.lang_code;
+        if (!language) continue;
+        const kind = attrs.kind === "asr" ? "automatic" : "manual";
+        const captionUrl = new URL(endpoint);
+        captionUrl.searchParams.set("v", id);
+        captionUrl.searchParams.set("lang", language);
+        if (attrs.name) captionUrl.searchParams.set("name", attrs.name);
+        if (kind === "automatic") captionUrl.searchParams.set("kind", "asr");
+        tracks.push({
+          language,
+          label: attrs.lang_translated || attrs.lang_original || language,
+          kind,
+          baseUrl: captionUrl.href
+        });
+      }
+      if (tracks.length) return tracks;
+    } catch { /* Try the other public YouTube timed-text endpoint. */ }
+  }
+  return [];
+}
+
 async function inspect(raw) {
   const id = getVideoId(raw);
-  const data = await playerInfo(id);
-  const tracks = captionTracks(data);
-  if (!tracks.length) throw new ApiError(404, "برای این ویدئو زیرنویسی در دسترس نیست.");
-  return { id, title: data.videoDetails?.title || "ویدئوی یوتیوب", tracks };
+  let data = null, playerError = null;
+  try { data = await playerInfo(id); } catch (error) { playerError = error; }
+  let tracks = data ? captionTracks(data) : [];
+  if (!tracks.length) tracks = await legacyCaptionTracks(id);
+  if (!tracks.length) {
+    if (playerError) throw playerError;
+    if (data?.playabilityStatus?.status && data.playabilityStatus.status !== "OK")
+      throw new ApiError(422, "این ویدئو برای دریافت زیرنویس در دسترس نیست.");
+    throw new ApiError(404, "برای این ویدئو زیرنویسی در دسترس نیست.");
+  }
+  return { id, title: data?.videoDetails?.title || "ویدئوی یوتیوب", tracks };
 }
 
 function cleanCaptionText(text) {
@@ -125,7 +169,7 @@ async function handleApi(request, pathname) {
     const track = result.tracks.find(item => item.language === language && item.kind === kind);
     if (!track) throw new ApiError(404, "این زبان یا نوع زیرنویس دیگر در دسترس نیست.");
     const captionUrl = new URL(track.baseUrl);
-    if (captionUrl.protocol !== "https:" || !["youtube.com", "www.youtube.com"].includes(captionUrl.hostname))
+    if (captionUrl.protocol !== "https:" || !["youtube.com", "www.youtube.com", "video.google.com"].includes(captionUrl.hostname))
       throw new ApiError(502, "نشانی زیرنویس یوتیوب نامعتبر است.");
     captionUrl.searchParams.set("fmt", "json3");
     const response = await fetch(captionUrl, { headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36", "referer": "https://www.youtube.com/" } });
