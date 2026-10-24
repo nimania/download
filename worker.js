@@ -86,9 +86,9 @@ async function legacyCaptionTracks(id) {
       if (!response.ok) continue;
       const xml = await response.text();
       const tracks = [];
-      for (const match of xml.matchAll(/<track\\b([^>]*)\\/?\\s*>/gi)) {
+      for (const match of xml.matchAll(/<track\b([^>]*)\/?\s*>/gi)) {
         const attrs = {};
-        for (const item of match[1].matchAll(/([\\w-]+)\\s*=\\s*"([^"]*)"/g)) attrs[item[1]] = item[2];
+        for (const item of match[1].matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)) attrs[item[1]] = item[2];
         const language = attrs.lang_code;
         if (!language) continue;
         const kind = attrs.kind === "asr" ? "automatic" : "manual";
