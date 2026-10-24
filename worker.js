@@ -1,10 +1,149 @@
 import page from "./index.html";
+
+function getVideoId(raw) {
+  let url;
+  try { url = new URL(raw); } catch { throw new ApiError(400, "لینک ویدئو معتبر نیست."); }
+  if (url.protocol !== "https:" || url.username || url.password) throw new ApiError(400, "فقط لینک HTTPS یوتیوب پذیرفته می‌شود.");
+  const host = url.hostname.toLowerCase();
+  let id = "";
+  if (host === "youtu.be") id = url.pathname.split("/").filter(Boolean)[0] || "";
+  else if (host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+    if (url.pathname === "/watch") id = url.searchParams.get("v") || "";
+    else if (/^\/(shorts|embed|live)\//.test(url.pathname)) id = url.pathname.split("/")[2] || "";
+  }
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) throw new ApiError(400, "لینک باید مربوط به یک ویدئوی یوتیوب باشد.");
+  return id;
+}
+
+class ApiError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+
+async function playerInfo(id) {
+  const response = await fetch(`https://www.youtube.com/watch?v=${id}&hl=en`, {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; SubtitleStudio/1.0)",
+      "accept-language": "en-US,en;q=0.9"
+    },
+    redirect: "follow"
+  });
+  if (!response.ok) throw new ApiError(502, "یوتیوب در حال حاضر پاسخ نمی‌دهد. کمی بعد دوباره تلاش کن.");
+  const html = await response.text();
+  const marker = html.indexOf("ytInitialPlayerResponse");
+  const start = marker < 0 ? -1 : html.indexOf("{", marker);
+  if (start < 0) throw new ApiError(422, "اطلاعات ویدئو از یوتیوب دریافت نشد؛ ممکن است ویدئو خصوصی، محدود یا موقتاً غیرقابل‌دسترسی باشد.");
+  let depth = 0, quoted = false, escaped = false, end = -1;
+  for (let i = start; i < html.length; i++) {
+    const char = html[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === "{") depth++;
+    else if (char === "}" && --depth === 0) { end = i + 1; break; }
+  }
+  if (end < 0) throw new ApiError(422, "پاسخ یوتیوب قابل‌خواندن نبود.");
+  let data;
+  try { data = JSON.parse(html.slice(start, end)); }
+  catch { throw new ApiError(422, "پاسخ یوتیوب قابل‌خواندن نبود."); }
+  const status = data.playabilityStatus?.status;
+  if (status && status !== "OK") throw new ApiError(422, "این ویدئو برای دریافت زیرنویس در دسترس نیست.");
+  return data;
+}
+
+function captionTracks(data) {
+  const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+  return tracks.map(track => ({
+    language: track.languageCode || "",
+    label: track.name?.simpleText || track.name?.runs?.map(run => run.text).join("") || track.languageCode || "زبان نامشخص",
+    kind: track.kind === "asr" || String(track.vssId || "").startsWith(".") ? "automatic" : "manual",
+    baseUrl: track.baseUrl
+  })).filter(track => track.language && track.baseUrl);
+}
+
+async function inspect(raw) {
+  const id = getVideoId(raw);
+  const data = await playerInfo(id);
+  const tracks = captionTracks(data);
+  if (!tracks.length) throw new ApiError(404, "برای این ویدئو زیرنویسی در دسترس نیست.");
+  return { id, title: data.videoDetails?.title || "ویدئوی یوتیوب", tracks };
+}
+
+function cleanCaptionText(text) {
+  return text.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+function timecode(ms) {
+  const value = Math.max(0, Number(ms) || 0);
+  const hours = Math.floor(value / 3600000);
+  const minutes = Math.floor(value % 3600000 / 60000);
+  const seconds = Math.floor(value % 60000 / 1000);
+  const millis = Math.floor(value % 1000);
+  return `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}.${String(millis).padStart(3,"0")}`;
+}
+function cuesFromJson3(raw) {
+  let data;
+  try { data = JSON.parse(raw); } catch { throw new ApiError(502, "قالب زیرنویس یوتیوب قابل‌خواندن نیست."); }
+  return (data.events || []).map(event => {
+    const text = cleanCaptionText((event.segs || []).map(segment => segment.utf8 || "").join("")).trim();
+    if (!text || event.tStartMs == null) return null;
+    const start = Number(event.tStartMs);
+    const end = start + Number(event.dDurationMs || 1500);
+    return { start, end, text };
+  }).filter(Boolean);
+}
+function makeSubtitle(cues, format) {
+  if (format === "txt") return [...new Set(cues.map(cue => cue.text.replace(/\s+/g, " ").trim()))].join("\n") + "\n";
+  if (format === "vtt") return "WEBVTT\n\n" + cues.map(cue => `${timecode(cue.start)} --> ${timecode(cue.end)}\n${cue.text}`).join("\n\n") + "\n";
+  return cues.map((cue, index) => `${index + 1}\n${timecode(cue.start).replace(".", ",")} --> ${timecode(cue.end).replace(".", ",")}\n${cue.text}`).join("\n\n") + "\n";
+}
+
+async function handleApi(request, pathname) {
+  try {
+    if (request.method !== "POST") return Response.json({ detail: "Method not allowed" }, { status: 405 });
+    let body;
+    try { body = await request.json(); } catch { throw new ApiError(400, "درخواست قابل‌خواندن نیست."); }
+    if (typeof body.url !== "string" || body.url.length > 2048) throw new ApiError(400, "لینک ویدئو را وارد کن.");
+    const result = await inspect(body.url);
+    if (pathname === "/api/inspect") {
+      return Response.json({ title: result.title, tracks: result.tracks.map(({ language, label, kind }) => ({ language, label, kind })) });
+    }
+    const { language, kind, format } = body;
+    if (typeof language !== "string" || !["manual", "automatic"].includes(kind) || !["txt", "srt", "vtt"].includes(format))
+      throw new ApiError(400, "زبان و قالب زیرنویس را انتخاب کن.");
+    const track = result.tracks.find(item => item.language === language && item.kind === kind);
+    if (!track) throw new ApiError(404, "این زبان یا نوع زیرنویس دیگر در دسترس نیست.");
+    const captionUrl = new URL(track.baseUrl);
+    if (captionUrl.protocol !== "https:" || !["youtube.com", "www.youtube.com"].includes(captionUrl.hostname))
+      throw new ApiError(502, "نشانی زیرنویس یوتیوب نامعتبر است.");
+    captionUrl.searchParams.set("fmt", "json3");
+    const response = await fetch(captionUrl, { headers: { "user-agent": "Mozilla/5.0 (compatible; SubtitleStudio/1.0)" } });
+    if (!response.ok) throw new ApiError(502, "یوتیوب نتوانست فایل زیرنویس را برگرداند.");
+    const raw = await response.text();
+    if (raw.length > 4_000_000) throw new ApiError(413, "فایل زیرنویس بیش از اندازه بزرگ است.");
+    const cues = cuesFromJson3(raw);
+    if (!cues.length) throw new ApiError(404, "متن زیرنویس خالی است یا برای این ویدئو در دسترس نیست.");
+    const output = makeSubtitle(cues, format);
+    const safeLanguage = language.replace(/[^a-zA-Z0-9_-]/g, "-");
+    return new Response(output, { headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "content-disposition": `attachment; filename="subtitles-${safeLanguage}.${format}"`,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff"
+    }});
+  } catch (error) {
+    const status = error instanceof ApiError ? error.status : 502;
+    return Response.json({ detail: error instanceof ApiError ? error.message : "ارتباط با یوتیوب ناموفق بود. کمی بعد دوباره تلاش کن." }, { status });
+  }
+}
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname === "/api/health") return Response.json({ ok: true, runtime: "cloudflare-workers" });
-    if (url.pathname === "/api/inspect" || url.pathname === "/api/download")
-      return Response.json({ detail: "Direct caption extraction is not available on Cloudflare Workers yet. You can convert an existing subtitle file using the form." }, { status: 501 });
+    if (url.pathname === "/api/health" && request.method === "GET") return Response.json({ ok: true, runtime: "cloudflare-workers" });
+    if (url.pathname === "/api/inspect" || url.pathname === "/api/download") return handleApi(request, url.pathname);
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
     if (url.pathname !== "/") return new Response("Not found", { status: 404 });
     return new Response(request.method === "HEAD" ? null : page, {
