@@ -1,59 +1,35 @@
-<!doctype html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Subtitle Studio | دانلود زیرنویس ویدئو</title>
-<style>
-*{box-sizing:border-box}body{background:#0b1120;color:#e9eef9;font-family:system-ui,Arial,sans-serif;margin:0}
-main{max-width:760px;margin:8vh auto;padding:26px}.eyebrow{color:#83b6fa;letter-spacing:1px}
-h1{font-size:clamp(32px,6vw,56px);line-height:1.35;margin:16px 0}
-p{color:#aebbd0;line-height:1.9}.panel{background:#162238;padding:24px;border:1px solid #2a3d57;border-radius:20px;margin-top:30px}
-input,select,button{font:inherit;padding:15px;border-radius:11px;border:1px solid #455875}
-input{width:100%;background:#0c1728;color:white;direction:ltr;text-align:left;margin-top:8px}
-button{background:#4d89ff;color:white;font-weight:700;cursor:pointer;border:0}
-button:disabled{opacity:.5;cursor:wait}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
-.actions select{background:#0c1728;color:white;flex:1;min-width:140px}#status{min-height:28px}
-small{color:#91a2b8}
-</style>
-</head>
-<body><main>
-<div class="eyebrow">SUBTITLE STUDIO</div>
-<h1>زیرنویس ویدئو،<br>در چند کلیک.</h1>
-<p>لینک ویدئوی YouTube یا Vimeo را وارد کنید تا زیرنویس‌های در دسترس را پیدا کنیم و در قالب متن ساده یا فایل زمان‌بندی‌شده دریافت کنید.</p>
-<section class="panel">
-<label for="url">لینک ویدئو</label>
-<input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
-<div class="actions"><button id="find">بررسی زیرنویس‌ها</button></div>
-<p id="status" role="status" aria-live="polite"></p>
-<div id="results" hidden><div class="actions">
-<select id="track" aria-label="زبان و نوع زیرنویس"></select>
-<select id="format" aria-label="قالب خروجی">
-<option value="txt">متن ساده TXT</option><option value="srt">زیرنویس SRT</option><option value="vtt">زیرنویس VTT</option>
-</select>
-<button id="download">دانلود فایل</button>
-</div></div></section>
-<p><small>این نسخه صرفاً زیرنویس‌های موجود را دریافت می‌کند. ممکن است پلتفرم‌ها محدودیت دسترسی یا نرخ درخواست داشته باشند.</small></p>
-</main><script>
-const el=id=>document.getElementById(id);let tracks=[];
-el('find').onclick=async()=>{
- el('find').disabled=true;el('results').hidden=true;el('status').textContent='در حال بررسی ویدئو…';
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Download | ابزار زیرنویس</title><style>
+:root{font-family:system-ui,-apple-system,Arial,sans-serif;color-scheme:dark}*{box-sizing:border-box}body{background:#0b1221;color:#e8eefc;margin:0}main{max-width:770px;margin:7vh auto;padding:25px}small{color:#a9b9d3}h1{font-size:clamp(30px,6vw,48px);margin:10px 0}p{line-height:1.9;color:#afbed5}.box{background:#17243b;border:1px solid #344564;border-radius:20px;padding:25px;margin-top:25px}label{display:block;margin-bottom:10px}input,select,button{font:inherit;border-radius:10px;padding:13px}input{width:100%;background:#091322;border:1px solid #465b7d;color:white}button{background:#518dff;border:0;color:white;font-weight:700;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.row select{flex:1;background:#091322;color:white;border:1px solid #465b7d}.hint{background:#242f43;padding:15px;border-radius:12px}#message{min-height:24px}#file{padding:10px}a{color:#a6c6ff}
+</style></head><body><main><small>DOWNLOAD · SUBTITLE TOOLS</small><h1>زیرنویس ویدئو، ساده و مرتب.</h1><p>نسخهٔ اولیهٔ Cloudflare آماده است. تبدیل فایل زیرنویس در مرورگر شما انجام می‌شود و نیازی به بارگذاری فایل روی سرور ندارد.</p>
+<div class="box"><h2>تبدیل زیرنویس</h2><p>فایل SRT یا VTT خودت را انتخاب کن و متن ساده، SRT یا VTT تحویل بگیر.</p><label for="file">فایل زیرنویس</label><input id="file" type="file" accept=".srt,.vtt,text/plain,text/vtt"><div class="row"><select id="format"><option value="txt">متن ساده (TXT)</option><option value="srt">زیرنویس SRT</option><option value="vtt">زیرنویس VTT</option></select><button id="convert">تبدیل و دانلود</button></div><p id="message" role="status"></p></div>
+<div class="box"><h2>دریافت مستقیم از لینک ویدئو</h2><p class="hint">این قابلیت هنوز در حال توسعه است. زیرساخت فعلی Cloudflare نمی‌تواند مستقیماً موتور پایتونی yt-dlp را اجرا کند. فعلاً از بخش تبدیل فایل استفاده کن.</p><input type="url" placeholder="https://www.youtube.com/watch?v=..." disabled aria-label="لینک ویدئو (به‌زودی)"></div>
+<p><small>کد پروژه: <a href="https://github.com/nimania/download" rel="noopener noreferrer">nimania/download</a></small></p></main><script>
+const $=id=>document.getElementById(id);
+function parse(source) {
+ source=source.replace(/\r/g,'').replace(/^\uFEFF/,'');
+ const blocks=source.split(/\n\s*\n/), list=[];
+ for(const b of blocks){
+  const ls=b.trim().split('\n'),i=ls.findIndex(x=>/-->/.test(x));
+  if(i<0)continue;
+  const m=ls[i].match(/(\d\d:\d\d:\d\d[.,]\d{1,3})\s*-->\s*(\d\d:\d\d:\d\d[.,]\d{1,3})/);
+  if(!m)continue;
+  const body=ls.slice(i+1).join('\n').replace(/<[^>]*>/g,'').trim();
+  if(body)list.push({start:m[1].replace('.',','),end:m[2].replace('.',','),body});
+ }
+ return list;
+}
+$('convert').onclick=async()=>{
+ const f=$('file').files[0];if(!f){$('message').textContent='لطفاً یک فایل انتخاب کن.';return;}
+ if(f.size>2_000_000){$('message').textContent='فایل باید کمتر از ۲ مگابایت باشد.';return;}
  try{
-  const response=await fetch('/api/inspect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:el('url').value.trim()})});
-  const result=await response.json();if(!response.ok)throw Error(result.detail||'خطا در بررسی ویدئو');
-  tracks=result.tracks;el('status').textContent=(result.title||'ویدئو')+' — '+tracks.length+' زیرنویس موجود';
-  el('track').replaceChildren(...tracks.map((t,i)=>{let o=document.createElement('option');o.value=i;o.textContent=t.language+' — '+(t.kind==='manual'?'اصلی':'خودکار');return o;}));
-  el('results').hidden=!tracks.length;
- }catch(error){el('status').textContent=error.message;}finally{el('find').disabled=false;}
-};
-el('download').onclick=async()=>{
- const t=tracks[Number(el('track').value)];if(!t)return;
- el('download').disabled=true;el('status').textContent='در حال دریافت فایل…';
- try{
-  const response=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:el('url').value.trim(),...t,format:el('format').value})});
-  if(!response.ok){const err=await response.json();throw Error(err.detail||'دانلود ناموفق بود');}
-  const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='subtitles-'+t.language+'.'+el('format').value;a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);el('status').textContent='دانلود آغاز شد.';
- }catch(error){el('status').textContent=error.message;}finally{el('download').disabled=false;}
+  const list=parse(await f.text());if(!list.length)throw Error('زمان‌بندی زیرنویس پیدا نشد.');
+  const format=$('format').value;
+  const out=format==='txt'?[...new Set(list.map(x=>x.body.replace(/\n/g,' ')))].join('\n'):
+    format==='srt'?list.map((x,i)=>(i+1)+'\n'+x.start+' --> '+x.end+'\n'+x.body).join('\n\n'):
+    'WEBVTT\n\n'+list.map(x=>x.start.replace(',','.')+' --> '+x.end.replace(',','.')+'\n'+x.body).join('\n\n');
+  const blob=new Blob([out],{type:'text/plain;charset=utf-8'}),u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download=(f.name.replace(/\.(srt|vtt)$/i,'')||'subtitle')+'.'+format;a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),2000);$('message').textContent=list.length+' بخش زیرنویس تبدیل شد.';
+ }catch(e){$('message').textContent=e.message;}
 };
 </script></body></html>
