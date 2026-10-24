@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Subtitle Studio | دانلود زیرنویس ویدئو</title>
+<style>
+*{box-sizing:border-box}body{background:#0b1120;color:#e9eef9;font-family:system-ui,Arial,sans-serif;margin:0}
+main{max-width:760px;margin:8vh auto;padding:26px}.eyebrow{color:#83b6fa;letter-spacing:1px}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.35;margin:16px 0}
+p{color:#aebbd0;line-height:1.9}.panel{background:#162238;padding:24px;border:1px solid #2a3d57;border-radius:20px;margin-top:30px}
+input,select,button{font:inherit;padding:15px;border-radius:11px;border:1px solid #455875}
+input{width:100%;background:#0c1728;color:white;direction:ltr;text-align:left;margin-top:8px}
+button{background:#4d89ff;color:white;font-weight:700;cursor:pointer;border:0}
+button:disabled{opacity:.5;cursor:wait}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}
+.actions select{background:#0c1728;color:white;flex:1;min-width:140px}#status{min-height:28px}
+small{color:#91a2b8}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">SUBTITLE STUDIO</div>
+<h1>زیرنویس ویدئو،<br>در چند کلیک.</h1>
+<p>لینک ویدئوی YouTube یا Vimeo را وارد کنید تا زیرنویس‌های در دسترس را پیدا کنیم و در قالب متن ساده یا فایل زمان‌بندی‌شده دریافت کنید.</p>
+<section class="panel">
+<label for="url">لینک ویدئو</label>
+<input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+<div class="actions"><button id="find">بررسی زیرنویس‌ها</button></div>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="results" hidden><div class="actions">
+<select id="track" aria-label="زبان و نوع زیرنویس"></select>
+<select id="format" aria-label="قالب خروجی">
+<option value="txt">متن ساده TXT</option><option value="srt">زیرنویس SRT</option><option value="vtt">زیرنویس VTT</option>
+</select>
+<button id="download">دانلود فایل</button>
+</div></div></section>
+<p><small>این نسخه صرفاً زیرنویس‌های موجود را دریافت می‌کند. ممکن است پلتفرم‌ها محدودیت دسترسی یا نرخ درخواست داشته باشند.</small></p>
+</main><script>
+const el=id=>document.getElementById(id);let tracks=[];
+el('find').onclick=async()=>{
+ el('find').disabled=true;el('results').hidden=true;el('status').textContent='در حال بررسی ویدئو…';
+ try{
+  const response=await fetch('/api/inspect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:el('url').value.trim()})});
+  const result=await response.json();if(!response.ok)throw Error(result.detail||'خطا در بررسی ویدئو');
+  tracks=result.tracks;el('status').textContent=(result.title||'ویدئو')+' — '+tracks.length+' زیرنویس موجود';
+  el('track').replaceChildren(...tracks.map((t,i)=>{let o=document.createElement('option');o.value=i;o.textContent=t.language+' — '+(t.kind==='manual'?'اصلی':'خودکار');return o;}));
+  el('results').hidden=!tracks.length;
+ }catch(error){el('status').textContent=error.message;}finally{el('find').disabled=false;}
+};
+el('download').onclick=async()=>{
+ const t=tracks[Number(el('track').value)];if(!t)return;
+ el('download').disabled=true;el('status').textContent='در حال دریافت فایل…';
+ try{
+  const response=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:el('url').value.trim(),...t,format:el('format').value})});
+  if(!response.ok){const err=await response.json();throw Error(err.detail||'دانلود ناموفق بود');}
+  const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='subtitles-'+t.language+'.'+el('format').value;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);el('status').textContent='دانلود آغاز شد.';
+ }catch(error){el('status').textContent=error.message;}finally{el('download').disabled=false;}
+};
+</script></body></html>
