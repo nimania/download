@@ -8,7 +8,7 @@
 <div class="row"><button id="inspect">بررسی زیرنویس‌ها</button></div><p id="ytMessage" role="status" aria-live="polite"></p>
 <div id="trackArea" hidden><p id="videoTitle"></p><label for="track">زبان و نوع زیرنویس</label><select id="track"></select>
 <div class="row"><select id="ytFormat" aria-label="قالب فایل"><option value="srt">زیرنویس SRT</option><option value="vtt">زیرنویس VTT</option><option value="txt">متن ساده TXT</option></select><button id="download">دریافت زیرنویس</button></div></div>
-<p class="hint">ویدئو یا لینک آن برای تبدیل ارسال نمی‌شود؛ سرویس فقط اطلاعات زیرنویس عمومی یوتیوب را می‌خواند. ویدئوهای خصوصی، محدود یا بدون زیرنویس ممکن است در دسترس نباشند.</p></section>
+<p class="hint">فایل ویدئو آپلود نمی‌شود؛ لینک فقط برای دریافت زیرنویس عمومی به سرویس فرستاده می‌شود. ویدئوهای خصوصی، محدود یا بدون زیرنویس ممکن است در دسترس نباشند.</p></section>
 <section class="box"><h2>تبدیل فایل زیرنویس</h2><p>فایل SRT یا VTT خودت را انتخاب کن و متن ساده، SRT یا VTT تحویل بگیر.</p><label for="file">فایل زیرنویس</label><input id="file" type="file" accept=".srt,.vtt,text/plain,text/vtt"><div class="row"><select id="format" aria-label="قالب خروجی"><option value="txt">متن ساده (TXT)</option><option value="srt">زیرنویس SRT</option><option value="vtt">زیرنویس VTT</option></select><button id="convert">تبدیل و دانلود</button></div><p id="message" role="status" aria-live="polite"></p></section>
 <p><small>کد پروژه: <a href="https://github.com/nimania/download" rel="noopener noreferrer">nimania/download</a></small></p></main><script>
 const $=id=>document.getElementById(id);let availableTracks=[];
