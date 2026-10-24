@@ -20,38 +20,47 @@ class ApiError extends Error {
 }
 
 async function playerInfo(id) {
-  const response = await fetch(`https://www.youtube.com/watch?v=${id}&hl=en`, {
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; SubtitleStudio/1.0)",
-      "accept-language": "en-US,en;q=0.9"
-    },
-    redirect: "follow"
-  });
-  if (!response.ok) throw new ApiError(502, "یوتیوب در حال حاضر پاسخ نمی‌دهد. کمی بعد دوباره تلاش کن.");
-  const html = await response.text();
-  const marker = html.indexOf("ytInitialPlayerResponse");
-  const start = marker < 0 ? -1 : html.indexOf("{", marker);
-  if (start < 0) throw new ApiError(422, "اطلاعات ویدئو از یوتیوب دریافت نشد؛ ممکن است ویدئو خصوصی، محدود یا موقتاً غیرقابل‌دسترسی باشد.");
-  let depth = 0, quoted = false, escaped = false, end = -1;
-  for (let i = start; i < html.length; i++) {
-    const char = html[i];
-    if (quoted) {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === '"') quoted = false;
-      continue;
+  const playerUrls = [
+    `https://www.youtube.com/watch?v=${id}&hl=en`,
+    `https://www.youtube.com/embed/${id}?hl=en`
+  ];
+  let lastData = null;
+  for (const playerUrl of playerUrls) {
+    const response = await fetch(playerUrl, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7",
+        "referer": "https://www.youtube.com/"
+      },
+      redirect: "follow"
+    });
+    if (!response.ok) continue;
+    const html = await response.text();
+    const marker = html.indexOf("ytInitialPlayerResponse");
+    const start = marker < 0 ? -1 : html.indexOf("{", marker);
+    if (start < 0) continue;
+    let depth = 0, quoted = false, escaped = false, end = -1;
+    for (let i = start; i < html.length; i++) {
+      const char = html[i];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') quoted = false;
+        continue;
+      }
+      if (char === '"') quoted = true;
+      else if (char === "{") depth++;
+      else if (char === "}" && --depth === 0) { end = i + 1; break; }
     }
-    if (char === '"') quoted = true;
-    else if (char === "{") depth++;
-    else if (char === "}" && --depth === 0) { end = i + 1; break; }
+    if (end < 0) continue;
+    try { lastData = JSON.parse(html.slice(start, end)); } catch { continue; }
+    if (lastData.playabilityStatus?.status === "OK" && captionTracks(lastData).length) return lastData;
   }
-  if (end < 0) throw new ApiError(422, "پاسخ یوتیوب قابل‌خواندن نبود.");
-  let data;
-  try { data = JSON.parse(html.slice(start, end)); }
-  catch { throw new ApiError(422, "پاسخ یوتیوب قابل‌خواندن نبود."); }
-  const status = data.playabilityStatus?.status;
-  if (status && status !== "OK") throw new ApiError(422, "این ویدئو برای دریافت زیرنویس در دسترس نیست.");
-  return data;
+  if (lastData?.playabilityStatus?.status && lastData.playabilityStatus.status !== "OK")
+    throw new ApiError(422, "این ویدئو برای دریافت زیرنویس در دسترس نیست.");
+  if (lastData) return lastData;
+  throw new ApiError(502, "یوتیوب اطلاعات ویدئو را برنگرداند. کمی بعد دوباره تلاش کن.");
 }
 
 function captionTracks(data) {
@@ -119,7 +128,7 @@ async function handleApi(request, pathname) {
     if (captionUrl.protocol !== "https:" || !["youtube.com", "www.youtube.com"].includes(captionUrl.hostname))
       throw new ApiError(502, "نشانی زیرنویس یوتیوب نامعتبر است.");
     captionUrl.searchParams.set("fmt", "json3");
-    const response = await fetch(captionUrl, { headers: { "user-agent": "Mozilla/5.0 (compatible; SubtitleStudio/1.0)" } });
+    const response = await fetch(captionUrl, { headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36", "referer": "https://www.youtube.com/" } });
     if (!response.ok) throw new ApiError(502, "یوتیوب نتوانست فایل زیرنویس را برگرداند.");
     const raw = await response.text();
     if (raw.length > 4_000_000) throw new ApiError(413, "فایل زیرنویس بیش از اندازه بزرگ است.");
